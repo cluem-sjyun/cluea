@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = "force-dynamic"; // 이거 꼭 추가!
+
 import { auth } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
