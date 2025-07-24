@@ -19,7 +19,11 @@ export default function LoginPage() {
         alert("cluem.com 도메인 이메일만 로그인할 수 있습니다.");
       }
     } catch (error) {
-      alert("로그인 실패: " + (error as any).message);
+      let msg = "알 수 없는 오류";
+  if (error instanceof Error) {
+    msg = error.message;
+  }
+  alert("로그인 실패: " + msg);
     }
   };
 
