@@ -12,7 +12,6 @@ export default function LoginPage() {
     try {
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email || "";
-      // cluem.com 이메일만 허용
       if (email.endsWith("@cluem.com")) {
         router.push("/main");
       } else {
@@ -20,10 +19,10 @@ export default function LoginPage() {
       }
     } catch (error) {
       let msg = "알 수 없는 오류";
-  if (error instanceof Error) {
-    msg = error.message;
-  }
-  alert("로그인 실패: " + msg);
+      if (error instanceof Error) {
+        msg = error.message;
+      }
+      alert("로그인 실패: " + msg);
     }
   };
 
@@ -44,7 +43,7 @@ export default function LoginPage() {
         }}
         onClick={handleGoogleLogin}
       >
-        Google로 로그인A
+        Google로 로그인
       </button>
     </div>
   );
