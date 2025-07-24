@@ -40,7 +40,7 @@ export default function LoginPage() {
         }}
         onClick={handleGoogleLogin}
       >
-        Google로 로그인
+        Google로 로그인A
       </button>
     </div>
   );
