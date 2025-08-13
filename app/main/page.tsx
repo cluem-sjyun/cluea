@@ -12,7 +12,15 @@ import {
   setDoc,
   serverTimestamp,
   updateDoc,
+  type Timestamp, // ✅ 추가
 } from "firebase/firestore";
+
+// ✅ 추가: 파이어스토어 문서 타입
+type SharedDoc = {
+  content?: string;
+  updatedAt?: Timestamp;        // 읽을 때는 Timestamp
+  updatedBy?: string | null;
+};
 
 export default function MainPage() {
   const router = useRouter();
@@ -21,34 +29,30 @@ export default function MainPage() {
   const [saving, setSaving] = useState(false);
   const [lastServerUpdatedAt, setLastServerUpdatedAt] = useState<number | null>(null);
 
-  // 모든 사용자가 함께 편집하는 단일 문서 (원하면 room 개념으로 확장)
   const sharedDocRef = useMemo(() => doc(db, "shared", "mainText"), []);
 
-  // 로그인 확인 + 문서 구독
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (!user || !user.email?.endsWith("@cluem.com")) {
-        router.replace("/"); // 가드와 동일한 정책 유지
+        router.replace("/");
         return;
       }
 
-      // 최초 로딩: 현재 서버 값 읽기
+      // 최초 로딩
       const snap = await getDoc(sharedDocRef);
       if (snap.exists()) {
-        const data = snap.data() as any;
+        const data = snap.data() as SharedDoc;    // ✅ any 제거
         setText(data.content ?? "");
-        if (data.updatedAt?.toMillis) {
-          setLastServerUpdatedAt(data.updatedAt.toMillis());
-        }
+        const millis = data.updatedAt?.toMillis(); // 안전하게 접근
+        if (millis) setLastServerUpdatedAt(millis);
       }
       setLoading(false);
 
       // 실시간 구독
       const unsubDoc = onSnapshot(sharedDocRef, (s) => {
         if (!s.exists()) return;
-        const d = s.data() as any;
-        // 내가 로컬에서 편집 중이더라도 서버 값이 더 최신이면 반영
-        const serverMillis = d.updatedAt?.toMillis?.();
+        const d = s.data() as SharedDoc;          // ✅ any 제거
+        const serverMillis = d.updatedAt?.toMillis();
         if (serverMillis && (!lastServerUpdatedAt || serverMillis > lastServerUpdatedAt)) {
           setText(d.content ?? "");
           setLastServerUpdatedAt(serverMillis);
@@ -67,7 +71,7 @@ export default function MainPage() {
       const user = auth.currentUser;
       const payload = {
         content: text,
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),  // 쓰기 시점은 FieldValue 허용됨
         updatedBy: user?.email ?? null,
       };
 
@@ -83,6 +87,7 @@ export default function MainPage() {
   };
 
   if (loading) return <div style={{ padding: 24 }}>로딩 중…</div>;
+
 
   return (
     <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
