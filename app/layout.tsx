@@ -3,8 +3,7 @@ import "./globals.css";
 import ClientAuthGuard from "./client-auth-guard";
 
 export const metadata = {
-  title: "My ClueA App",
-  description: "ClueA 전용 서비스",
+  title: "ClueA",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

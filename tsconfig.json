@@ -14,12 +14,14 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [
-      {
-        "name": "next"
-      }
+      { "name": "next" }
     ],
+
+    // ✅ 경로 별칭 핵심
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["*"],          // 예: "@/firebase" → "./firebase.ts"
+      "@/app/*": ["app/*"]   // 예: "@/app/main/page" → "./app/main/page"
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
