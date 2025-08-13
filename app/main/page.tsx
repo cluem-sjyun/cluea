@@ -12,13 +12,13 @@ import {
   setDoc,
   serverTimestamp,
   updateDoc,
-  type Timestamp, // ✅ 추가
+  type Timestamp,
 } from "firebase/firestore";
+import styles from "./page.module.css"; // ✅ 추가
 
-// ✅ 추가: 파이어스토어 문서 타입
 type SharedDoc = {
   content?: string;
-  updatedAt?: Timestamp;        // 읽을 때는 Timestamp
+  updatedAt?: Timestamp;
   updatedBy?: string | null;
 };
 
@@ -38,20 +38,18 @@ export default function MainPage() {
         return;
       }
 
-      // 최초 로딩
       const snap = await getDoc(sharedDocRef);
       if (snap.exists()) {
-        const data = snap.data() as SharedDoc;    // ✅ any 제거
+        const data = snap.data() as SharedDoc;
         setText(data.content ?? "");
-        const millis = data.updatedAt?.toMillis(); // 안전하게 접근
+        const millis = data.updatedAt?.toMillis();
         if (millis) setLastServerUpdatedAt(millis);
       }
       setLoading(false);
 
-      // 실시간 구독
       const unsubDoc = onSnapshot(sharedDocRef, (s) => {
         if (!s.exists()) return;
-        const d = s.data() as SharedDoc;          // ✅ any 제거
+        const d = s.data() as SharedDoc;
         const serverMillis = d.updatedAt?.toMillis();
         if (serverMillis && (!lastServerUpdatedAt || serverMillis > lastServerUpdatedAt)) {
           setText(d.content ?? "");
@@ -71,7 +69,7 @@ export default function MainPage() {
       const user = auth.currentUser;
       const payload = {
         content: text,
-        updatedAt: serverTimestamp(),  // 쓰기 시점은 FieldValue 허용됨
+        updatedAt: serverTimestamp(),
         updatedBy: user?.email ?? null,
       };
 
@@ -88,50 +86,30 @@ export default function MainPage() {
 
   if (loading) return <div style={{ padding: 24 }}>로딩 중…</div>;
 
-
   return (
-    <div style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 22, marginBottom: 12 }}>공동 메모장</h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>공동 메모장</h1>
 
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="여기에 자유롭게 작성하세요. 저장하면 모두에게 보입니다."
-        style={{
-          width: "100%",
-          minHeight: 320,
-          padding: 12,
-          fontSize: 16,
-          lineHeight: 1.5,
-          border: "1px solid #ddd",
-          borderRadius: 8,
-          resize: "vertical",
-          background: "#fff",
-        }}
-      />
+      <div className={styles.editorWrap}>
+        <textarea
+          className={styles.editor}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="여기에 자유롭게 작성하세요. 저장하면 모두에게 보입니다."
+        />
+      </div>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+      <div className={styles.actions}>
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: "none",
-            cursor: "pointer",
-            background: saving ? "#ccc" : "#2f7cf6",
-            color: "#fff",
-            fontWeight: 600,
-          }}
+          className={styles.button}
         >
           {saving ? "저장 중…" : "저장"}
         </button>
-
-        {/* 자동 저장 원하면 아래 주석을 참고해 throttle/debounce 로직 추가 */}
-        {/* 예: useEffect로 text 변경 시 800ms 후 setDoc 호출 (lodash.debounce) */}
       </div>
 
-      <p style={{ marginTop: 8, color: "#666" }}>
+      <p className={styles.help}>
         실시간 동기화: 다른 사용자가 저장하면 이 화면에도 곧바로 반영됩니다.
       </p>
     </div>
