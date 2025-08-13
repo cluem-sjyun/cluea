@@ -12,7 +12,12 @@ import {
   setDoc,
   serverTimestamp,
   updateDoc,
+  Timestamp,
 } from "firebase/firestore";
+import {
+  SharedDoc,
+  sharedDocConverter,
+} from "@/app/lib/firestoreTypes"; // ⬅️ 추가
 
 export default function MainPage() {
   const router = useRouter();
@@ -21,34 +26,35 @@ export default function MainPage() {
   const [saving, setSaving] = useState(false);
   const [lastServerUpdatedAt, setLastServerUpdatedAt] = useState<number | null>(null);
 
-  // 모든 사용자가 함께 편집하는 단일 문서 (원하면 room 개념으로 확장)
-  const sharedDocRef = useMemo(() => doc(db, "shared", "mainText"), []);
+  const sharedDocRef = useMemo(
+    () => doc(db, "shared", "mainText").withConverter(sharedDocConverter),
+    []
+  );
 
-  // 로그인 확인 + 문서 구독
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (!user || !user.email?.endsWith("@cluem.com")) {
-        router.replace("/"); // 가드와 동일한 정책 유지
+        router.replace("/");
         return;
       }
 
-      // 최초 로딩: 현재 서버 값 읽기
       const snap = await getDoc(sharedDocRef);
       if (snap.exists()) {
-        const data = snap.data() as any;
+        const data = snap.data(); // SharedDoc 타입
         setText(data.content ?? "");
-        if (data.updatedAt?.toMillis) {
-          setLastServerUpdatedAt(data.updatedAt.toMillis());
+        const ts = data.updatedAt;
+        if (ts instanceof Timestamp) {
+          setLastServerUpdatedAt(ts.toMillis());
         }
       }
       setLoading(false);
 
-      // 실시간 구독
       const unsubDoc = onSnapshot(sharedDocRef, (s) => {
         if (!s.exists()) return;
-        const d = s.data() as any;
-        // 내가 로컬에서 편집 중이더라도 서버 값이 더 최신이면 반영
-        const serverMillis = d.updatedAt?.toMillis?.();
+        const d = s.data(); // SharedDoc 타입
+        const ts = d.updatedAt;
+        const serverMillis = ts instanceof Timestamp ? ts.toMillis() : undefined;
+
         if (serverMillis && (!lastServerUpdatedAt || serverMillis > lastServerUpdatedAt)) {
           setText(d.content ?? "");
           setLastServerUpdatedAt(serverMillis);
@@ -65,17 +71,23 @@ export default function MainPage() {
     setSaving(true);
     try {
       const user = auth.currentUser;
-      const payload = {
+      const payload: SharedDoc = {
         content: text,
-        updatedAt: serverTimestamp(),
+        // 서버에서 Timestamp로 셋팅됨(쓰기 시점엔 FieldValue지만 읽힐 땐 Timestamp)
         updatedBy: user?.email ?? null,
       };
 
       const snap = await getDoc(sharedDocRef);
       if (snap.exists()) {
-        await updateDoc(sharedDocRef, payload);
+        await updateDoc(sharedDocRef, {
+          ...payload,
+          updatedAt: serverTimestamp(),
+        });
       } else {
-        await setDoc(sharedDocRef, payload);
+        await setDoc(sharedDocRef, {
+          ...payload,
+          updatedAt: serverTimestamp(),
+        });
       }
     } finally {
       setSaving(false);
@@ -121,9 +133,6 @@ export default function MainPage() {
         >
           {saving ? "저장 중…" : "저장"}
         </button>
-
-        {/* 자동 저장 원하면 아래 주석을 참고해 throttle/debounce 로직 추가 */}
-        {/* 예: useEffect로 text 변경 시 800ms 후 setDoc 호출 (lodash.debounce) */}
       </div>
 
       <p style={{ marginTop: 8, color: "#666" }}>
