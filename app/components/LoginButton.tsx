@@ -6,6 +6,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
 } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
@@ -20,8 +21,8 @@ export default function LoginButton() {
     setLoading(true);
 
     const provider = new GoogleAuthProvider();
+
     try {
-      // 1) 우선 팝업
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email || '';
       if (email.endsWith('@cluem.com')) {
@@ -29,26 +30,33 @@ export default function LoginButton() {
       } else {
         alert('cluem.com 도메인 이메일만 로그인할 수 있습니다.');
       }
-    } catch (err: any) {
-      // 2) 팝업 실패 케이스 → 리다이렉트 폴백
-      const code = err?.code || '';
-      const fallback =
+    } catch (err: unknown) {
+      // 타입 안전하게 코드/메시지 추출
+      let code = '';
+      let message = '알 수 없는 오류';
+      if (err instanceof FirebaseError) {
+        code = err.code;
+        message = err.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      const shouldRedirect =
         code === 'auth/popup-blocked' ||
         code === 'auth/popup-closed-by-user' ||
         code === 'auth/operation-not-supported-in-this-environment' ||
-        code === 'auth/internal-error'; // 드물게 내부 에러 시도 폴백
+        code === 'auth/internal-error';
 
-      if (fallback) {
+      if (shouldRedirect) {
         try {
           await signInWithRedirect(auth, provider);
-          return; // 리다이렉트 진행
+          return;
         } catch (e) {
-          console.error(e);
-          alert('로그인 실패(redirect): ' + (e as Error).message);
+          const m = e instanceof Error ? e.message : '알 수 없는 오류';
+          alert('로그인 실패(redirect): ' + m);
         }
       } else {
-        console.error(err);
-        alert('로그인 실패: ' + (err as Error).message);
+        alert('로그인 실패: ' + message);
       }
     } finally {
       busy.current = false;
