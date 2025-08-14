@@ -4,7 +4,7 @@
 import { useEffect, useState, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth } from "@lib/firebase.client";
 
 export default function ClientAuthGuard({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
