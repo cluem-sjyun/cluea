@@ -1,4 +1,4 @@
-// app/main/page.tsx
+// app/note1/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -22,7 +22,7 @@ type SharedDoc = {
   updatedBy?: string | null;
 };
 
-export default function MainPage() {
+export default function Note1() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function MainPage() {
   if (loading) return <div style={{ padding: 24 }}>로딩 중…</div>;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} page-fill`}>
       <h1 className={styles.title}>공동 메모장</h1>
 
       <div className={styles.editorWrap}>

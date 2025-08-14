@@ -13,7 +13,7 @@ export default function LoginButton() {
       const result = await signInWithPopup(auth, provider);
       const email = result.user.email || "";
       if (email.endsWith("@cluem.com")) {
-        router.push("/main");
+        router.push("/note1");
       } else {
         alert("cluem.com 도메인 이메일만 로그인할 수 있습니다.");
       }

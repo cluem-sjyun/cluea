@@ -20,7 +20,7 @@
     // ✅ 경로 별칭 핵심
     "baseUrl": ".",
     "paths": {
-      "@/*": ["*"],          // 예: "@/firebase" → "./firebase.ts"
+      "@/*": ["./*"],          // 예: "@/firebase" → "./firebase.ts"
       "@/app/*": ["app/*"]   // 예: "@/app/main/page" → "./app/main/page"
     }
   },
