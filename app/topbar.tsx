@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/note1", label: "note1" },
   { href: "/note2", label: "note2" },
-  { href: "/ex3",   label: "ex3"   },
+  { href: "/sip-bulk",   label: "SIP BULK"   },
   { href: "/ex4",   label: "ex4"   },
   { href: "/ex5",   label: "ex5"   },
 ];
