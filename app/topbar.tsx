@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/note1", label: "note1" },
-  { href: "/note2", label: "note2" },
-  { href: "/sip-bulk",   label: "SIP BULK"   },
-  { href: "/ex4",   label: "ex4"   },
-  { href: "/ex5",   label: "ex5"   },
+  { href: "/note1",       label: "Note1" },
+  { href: "/note2",       label: "Note2" },
+  { href: "/user-creator", label: "User Creator" },
+  { href: "/user-deleter", label: "User Deleter" },
+  { href: "/ex5",         label: "ex5" },
 ];
 
 export default function Topbar() {
@@ -17,14 +17,13 @@ export default function Topbar() {
 
   return (
     <header
-      /* ★ fixed 제거: 그리드의 첫 번째 행에서 항상 보임 */
       style={{
         height: "var(--topbar-h)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 12px",
-        boxShadow: "0 1px 0 rgba(0,0,0,0.06)", // border-bottom 대신 사용 (1px 반올림 이슈 회피)
+        boxShadow: "0 1px 0 rgba(0,0,0,0.06)",
         background: "#fff",
         zIndex: 1,
       }}
