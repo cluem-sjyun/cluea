@@ -14,7 +14,7 @@ import {
   updateDoc,
   type Timestamp,
 } from "firebase/firestore";
-import styles from "./page.module.css"; // ✅ 추가
+import styles from "./page.module.css";
 
 type SharedDoc = {
   content?: string;

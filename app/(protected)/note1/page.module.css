@@ -1,7 +1,6 @@
 /* app/note1/page.module.css */
 
 .page {
-  /* .app-content가 정확한 높이를 가지므로 100%가 안정적으로 동작 */
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -9,7 +8,6 @@
 
   max-width: 1000px;
   margin: 0 auto;
-  /* .app-content에 패딩이 있으니 여기 패딩은 선택 사항 */
   padding: 0;
 }
 
@@ -20,13 +18,13 @@
 
 .editorWrap {
   flex: 1;
-  min-height: 0;   /* ★ 자식 높이 계산용 */
+  min-height: 0;
   display: flex;
 }
 
 .editor {
   flex: 1;
-  min-height: 0;   /* ★ vh 제거 */
+  min-height: 0;
   height: auto;
 
   padding: 12px;
@@ -36,7 +34,6 @@
   border-radius: 12px;
   background: #fff;
 
-  /* 매우 작은 화면 대비, 최소 블록 높이만 약하게 */
   min-block-size: 200px;
   resize: vertical;
 }

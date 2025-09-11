@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import * as XLSX from "xlsx";
 
 type RangeRow = { start: string; end: string };
 
@@ -16,8 +17,32 @@ export default function UserDeleterPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [debugStatus, setDebugStatus] = useState<null | "ok" | "fail">(null);
-  const [debugMsg, setDebugMsg] = useState<string>("");
+
+  // 숫자 배열 → 정렬·중복제거
+  const normalizeNumbers = (nums: number[]) =>
+    Array.from(new Set(nums.filter((n) => Number.isInteger(n)))).sort((a, b) => a - b);
+
+  // 숫자 배열 → 연속 구간으로 압축([{start,end},...])
+  const compressToRanges = (nums: number[]): Array<{ start: number; end: number }> => {
+    const res: Array<{ start: number; end: number }> = [];
+    if (nums.length === 0) return res;
+    let s = nums[0];
+    let p = nums[0];
+    for (let i = 1; i <= nums.length; i++) {
+      const cur = nums[i];
+      if (cur === p + 1) {
+        p = cur;
+        continue;
+      }
+      // 구간 종료
+      res.push({ start: s, end: p });
+      if (cur != null) {
+        s = cur;
+        p = cur;
+      }
+    }
+    return res;
+  };
 
   // 행 추가/삭제/수정
   const addRow = (afterIdx?: number) =>
@@ -34,33 +59,67 @@ export default function UserDeleterPage() {
   const updateRow = (idx: number, key: keyof RangeRow, value: string) =>
     setRanges((rows) => rows.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
 
+  // 디버그 bat 다운로드(유지)
   async function downloadDebugBat() {
     window.location.href = "/api/chrome-debug-bat";
   }
 
-  async function checkDebugPort() {
-    setDebugStatus(null);
-    setDebugMsg("확인 중...");
+  // ✅ Import 양식(XLSX) 다운로드: ‘내선번호’만 필수, 나머지 컬럼은 있어도 무시됨
+  const downloadImportTemplate = () => {
+    const headers = ["내선번호", "Type(무시됨)", "Entity(무시됨)", "Hunt(무시됨)", "Pick-up(무시됨)"];
+    const example = [
+      { "내선번호": 1000, "Type(무시됨)": "SIP extension", "Entity(무시됨)": "16", "Hunt(무시됨)": "6200", "Pick-up(무시됨)": "sales" },
+      { "내선번호": 1001, "Type(무시됨)": "", "Entity(무시됨)": "", "Hunt(무시됨)": "", "Pick-up(무시됨)": "" },
+      { "내선번호": 1002, "Type(무시됨)": "", "Entity(무시됨)": "", "Hunt(무시됨)": "", "Pick-up(무시됨)": "" },
+      { "내선번호": 1010, "Type(무시됨)": "", "Entity(무시됨)": "", "Hunt(무시됨)": "", "Pick-up(무시됨)": "" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(example, { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "delete_import");
+    XLSX.writeFile(wb, "user_deleter_import_template.xlsx");
+  };
+
+  // ✅ XLSX Import: ‘내선번호’만 사용해서 연속구간으로 압축 후 폼에 추가
+  const importFromExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     try {
-      const res = await fetch("http://127.0.0.1:9222/json/version", { cache: "no-store" });
-      if (!res.ok) {
-        setDebugStatus("fail");
-        setDebugMsg(`응답 오류: ${res.status}`);
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      // ‘내선번호’만 추출 → 숫자만 → 정렬+중복제거
+      const nums = normalizeNumbers(
+        json.map((r) => Number(r["내선번호"])).filter((n) => Number.isFinite(n))
+      );
+
+      if (nums.length === 0) {
+        alert("엑셀에서 유효한 ‘내선번호’를 찾지 못했습니다.");
+        e.target.value = "";
         return;
       }
-      const data = await res.json();
-      if (data?.webSocketDebuggerUrl) {
-        setDebugStatus("ok");
-        setDebugMsg("디버그 포트 감지됨 ✅");
-      } else {
-        setDebugStatus("fail");
-        setDebugMsg("디버그 포트 응답은 있었으나 예상 필드가 없습니다.");
-      }
-    } catch (e: any) {
-      setDebugStatus("fail");
-      setDebugMsg(`연결 실패: ${e?.message || e}`);
+
+      // 연속 구간으로 압축
+      const zipped = compressToRanges(nums);
+
+      // 기존 빈 행 제거 + 새 구간 추가
+      setRanges((old) => {
+        const keep = old.filter(
+          (r) => r.start?.toString().trim() !== "" && r.end?.toString().trim() !== ""
+        );
+        const appended = zipped.map((z) => ({ start: String(z.start), end: String(z.end) }));
+        return [...keep, ...appended];
+      });
+
+      // 파일 인풋 리셋(같은 파일 재업로드 허용)
+      e.target.value = "";
+    } catch (err: any) {
+      console.error(err);
+      alert(`엑셀 처리 중 오류: ${err?.message || err}`);
     }
-  }
+  };
 
   const submit = async () => {
     setLoading(true);
@@ -79,15 +138,12 @@ export default function UserDeleterPage() {
         return Number.isInteger(n) ? n : undefined;
       };
 
+      // 폼의 범위들을 확장해서 개별 번호 목록으로
       const extList: number[] = [];
-
       for (const row of ranges) {
         const s = toInt(row.start);
         const e = toInt(row.end);
-
-        // 둘 중 하나라도 비었으면 이 행은 무시 (빈칸 허용)
-        if (s === undefined || e === undefined) continue;
-
+        if (s === undefined || e === undefined) continue; // 빈 행 무시
         const [from, to] = s <= e ? [s, e] : [e, s];
         for (let n = from; n <= to; n++) extList.push(n);
       }
@@ -96,7 +152,7 @@ export default function UserDeleterPage() {
         throw new Error("삭제할 내선번호가 없습니다. (빈 줄은 무시됩니다)");
       }
 
-      // 중복 제거 + 정렬
+      // 정렬 + 중복 제거
       const uniq = Array.from(new Set(extList)).sort((a, b) => a - b);
 
       const res = await fetch("/api/user-deleter-run", {
@@ -126,47 +182,66 @@ export default function UserDeleterPage() {
     <main style={{ padding: 16, display: "grid", gap: 12 }}>
       <h1 style={{ fontSize: 18, fontWeight: 700 }}>User Deleter</h1>
 
-      {/* 디버그 모드 */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={downloadDebugBat} className="border px-3 py-2 rounded bg-gray-50">
-          실행 전 크롬을 디버그모드로 실행시키기(필수)
-        </button>
-        <button onClick={checkDebugPort} className="border px-3 py-2 rounded">
-          상태 확인
-        </button>
-        {debugStatus === "ok" && <span style={{ color: "green" }}>{debugMsg}</span>}
-        {debugStatus === "fail" && <span style={{ color: "crimson" }}>{debugMsg}</span>}
-        {debugStatus === null && debugMsg && <span>{debugMsg}</span>}
+      {/* 상단 고정: 디버그 bat + 템플릿 + Import + IP/ID/PW */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "white",
+          padding: "10px 8px",
+          borderBottom: "1px solid #e5e7eb",
+          display: "grid",
+          gap: 10,
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={downloadDebugBat} className="border px-3 py-2 rounded bg-gray-50">
+            실행 전 크롬을 디버그모드로 실행시키기(필수)
+          </button>
+
+          <button onClick={downloadImportTemplate} className="border px-3 py-2 rounded">
+            Import 양식 다운로드 (XLSX)
+          </button>
+
+          {/* ✅ Import 버튼 */}
+          <label className="border px-3 py-2 rounded cursor-pointer bg-gray-50">
+            Import
+            <input type="file" accept=".xlsx,.xls" hidden onChange={importFromExcel} />
+          </label>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <label style={{ display: "grid", gap: 6 }}>
+            <span>IP/URL</span>
+            <input
+              className="border p-2 rounded"
+              value={ip}
+              onChange={(e) => setIp(e.target.value)}
+              placeholder="https://192.168.x.x"
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span>계정(기본값: mtcl)</span>
+            <input
+              className="border p-2 rounded"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: 6 }}>
+            <span>비밀번호(기본값: C로 시작하는)</span>
+            <input
+              type="password"
+              className="border p-2 rounded"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+        </div>
       </div>
-
-      <label style={{ display: "grid", gap: 6 }}>
-        <span>IP/URL</span>
-        <input
-          className="border p-2 rounded"
-          value={ip}
-          onChange={(e) => setIp(e.target.value)}
-          placeholder="https://192.168.x.x"
-        />
-      </label>
-
-      <label style={{ display: "grid", gap: 6 }}>
-        <span>계정(기본값: mtcl)</span>
-        <input
-          className="border p-2 rounded"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-      </label>
-
-      <label style={{ display: "grid", gap: 6 }}>
-        <span>비밀번호(기본값: C로 시작하는)</span>
-        <input
-          type="password"
-          className="border p-2 rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
 
       {/* ✅ 범위 입력 패널 (여러 행) */}
       <div className="border rounded p-3" style={{ display: "grid", gap: 10 }}>
@@ -228,7 +303,8 @@ export default function UserDeleterPage() {
         </div>
 
         <small style={{ color: "#6b7280" }}>
-          여러 범위를 추가할 수 있어요. 제출 시 각 범위를 확장해 일괄 삭제합니다.
+          여러 범위를 추가할 수 있어요. 제출 시 각 범위를 확장해 일괄 삭제합니다.  
+          Import 시 ‘내선번호’만 사용하며, 연속 번호는 자동으로 한 범위로 합쳐집니다.
         </small>
       </div>
 

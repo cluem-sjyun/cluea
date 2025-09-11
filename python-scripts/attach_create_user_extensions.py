@@ -14,7 +14,7 @@
 - 크롬 디버그 모드 실행 (--remote-debugging-port=9222)
 """
 
-import os, time, socket, signal, sys
+import os, time, socket, signal, sys, json
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -406,22 +406,68 @@ def _debug_port_up(port):
         return False
 
 def main():
-    # 파라미터 검증
-    if not START_EXT or not END_EXT:
-        print("입력값 오류: START_EXT / END_EXT 필요")
-        return 1
-    try:
-        s = int(START_EXT); e = int(END_EXT)
-        if s > e: s, e = e, s
-    except Exception:
-        print("입력값 오류: START_EXT / END_EXT 정수 필수")
-        return 1
+    # 1) jobs 입력 파싱 (JOBS_JSON 우선, 없으면 단일 범위 호환)
+    jobs_json = os.getenv("JOBS_JSON", "").strip()
+    jobs = []
+    if jobs_json:
+        try:
+            raw = json.loads(jobs_json)
+            assert isinstance(raw, list)
+            for j in raw:
+                s = int(j.get("startExt"))
+                e = int(j.get("endExt"))
+                if s > e: s, e = e, s
+                jobs.append({
+                    "startExt": s,
+                    "endExt": e,
+                    "entity": (j.get("entity") or "").strip(),
+                    "setTypeValue": (j.get("setTypeValue") or "").strip(),
+                    "setTypeText": (j.get("setTypeText") or "").strip(),
+                    "huntGroup": (j.get("huntGroup") or "").strip(),
+                    "pickupGroup": (j.get("pickupGroup") or "").strip(),
+                })
+        except Exception as e:
+            print(f"[입력 파싱 오류] JOBS_JSON: {e}")
+            return 1
+    else:
+        # 구버전 호환 (단일 범위)
+        START_EXT = os.getenv("START_EXT")
+        END_EXT   = os.getenv("END_EXT")
+        if not START_EXT or not END_EXT:
+            print("입력값 오류: JOBS_JSON 또는 START_EXT/END_EXT 필요")
+            return 1
+        try:
+            s = int(START_EXT); e = int(END_EXT)
+            if s > e: s, e = e, s
+        except Exception:
+            print("입력값 오류: START_EXT/END_EXT 정수 필수")
+            return 1
+        jobs.append({
+            "startExt": s,
+            "endExt": e,
+            "entity": (os.getenv("ENTITY", "") or "").strip(),
+            "setTypeValue": (os.getenv("SET_TYPE_VALUE", "") or "").strip(),
+            "setTypeText": (os.getenv("SET_TYPE_TEXT", "") or "").strip(),
+            "huntGroup": (os.getenv("HUNT_GROUP", "") or "").strip(),
+            "pickupGroup": (os.getenv("PICKUP_GROUP", "") or "").strip(),
+        })
 
-    entity_value = ENTITY if ENTITY != "" else None
+    # 2) 크롬 디버그 포트 확인/드라이버 연결
+    DEBUG_PORT = 9222
+    def _debug_port_up(port):
+        import socket
+        s = socket.socket(); s.settimeout(0.5)
+        try:
+            s.connect(("127.0.0.1", port)); s.close(); return True
+        except Exception: return False
 
     if not _debug_port_up(DEBUG_PORT):
         print(f"[오류] 디버그 포트 {DEBUG_PORT} 의 크롬을 찾지 못했습니다.")
         return 1
+
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
 
     options = webdriver.ChromeOptions()
     options.add_experimental_option("debuggerAddress", f"127.0.0.1:{DEBUG_PORT}")
@@ -430,32 +476,47 @@ def main():
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
+    LOGIN_URL = os.getenv("LOGIN_URL", "https://127.0.0.1")
+    driver.get(LOGIN_URL)
+
     try:
-        driver.get(LOGIN_URL)
+        # ✅ 로그인 1회만 수행
         ensure_login(driver)
 
-        print(f"[작업] {s} ~ {e}")
-        for ext in range(s, e + 1):
-            if should_cancel():
-                print("[중단] 취소 감지(루프)")
-                return 1
-            print(f" - {ext} 생성 시도...")
-            try:
-                check_session_and_relogin(driver)
-                create_one(driver, ext, entity_value=entity_value)
-                print(f"   > {ext} 생성 완료")
-            except TimeoutException as te:
-                print(f"   ! {ext} 타임아웃: {te} → 다음으로 진행")
-                continue
-            except Exception as ex:
-                print(f"   ! {ext} 실패: {ex} → 다음으로 진행")
-                continue
+        # 3) 모든 묶음을 **한 세션에서 연속 처리**
+        for idx, j in enumerate(jobs):
+            print(f"[묶음 {idx+1}/{len(jobs)}] {j['startExt']}~{j['endExt']} "
+                  f"(type='{j['setTypeValue'] or j['setTypeText']}', entity='{j['entity']}', "
+                  f"HG='{j['huntGroup']}', PG='{j['pickupGroup']}')")
 
-        print("[끝] 모든 작업 완료")
+            # 묶음별 동적 설정(전역/모듈 변수를 쓰는 유틸이면 setter로 전달)
+            global SET_TYPE_VALUE, SET_TYPE_TEXT, HUNT_GROUP, PICKUP_GROUP
+            SET_TYPE_VALUE = j["setTypeValue"]
+            SET_TYPE_TEXT  = j["setTypeText"]
+            HUNT_GROUP     = j["huntGroup"]
+            PICKUP_GROUP   = j["pickupGroup"]
+            entity_value   = j["entity"] or None
+
+            for ext in range(j["startExt"], j["endExt"] + 1):
+                if should_cancel():
+                    print("[중단] 취소 감지 → 즉시 종료")
+                    return 1
+                print(f" - {ext} 생성 시도...")
+                try:
+                    # 세션 만료/팝업 여부 가벼운 체크
+                    check_session_and_relogin(driver)
+                    create_one(driver, ext, entity_value=entity_value)
+                    print(f"   > {ext} 생성 완료")
+                except TimeoutException as te:
+                    print(f"   ! {ext} 타임아웃: {te} → 다음으로 진행")
+                except Exception as ex:
+                    print(f"   ! {ext} 실패: {ex} → 다음으로 진행")
+
+        print("[끝] 모든 묶음 처리 완료")
         return 0
 
     except KeyboardInterrupt:
-        print("\n[중단] Ctrl+C 감지 → 루프 종료")
+        print("\n[중단] Ctrl+C 감지 → 종료")
         return 1
     except Exception as e:
         print(f"[예외 종료] {e}")

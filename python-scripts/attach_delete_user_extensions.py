@@ -171,6 +171,80 @@ def safe_send_keys(driver, locator_or_element, text, total_sec=10, step=0.3):
         time.sleep(step)
     raise last_err or TimeoutException("send_keys 실패")
 
+# 추가 유틸
+def _is_attached(driver, el):
+    try:
+        return driver.execute_script("return document.contains(arguments[0]);", el)
+    except Exception:
+        return False
+
+def safe_send_keys_refind(driver, locator, text, total_sec=5.0, step=0.2):
+    """
+    locator를 기준으로 매번 다시 찾고 입력.
+    - stale, frame 변경을 견딤
+    - value 검증까지 해서 안정화
+    """
+    end = time.time() + _adj(total_sec, 0.5)
+    step = _adj(step, 0.08)
+    last_err = None
+    while time.time() < end:
+        if should_cancel():
+            raise TimeoutException("취소 감지")
+        try:
+            # 프레임 재진입 + 요소 재탐색
+            el = wait_present(driver, locator, total_sec=min(step, 0.8), step=step)
+
+            # stale 예방: 붙어있는지 검사
+            if not _is_attached(driver, el):
+                raise StaleElementReferenceException("detached")
+
+            try:
+                el.clear()
+            except Exception:
+                # 일부 필드는 clear가 안 먹음 → JS로 강제 초기화
+                try:
+                    driver.execute_script("arguments[0].value='';", el)
+                except Exception:
+                    pass
+
+            try:
+                el.send_keys(text)
+            except (ElementNotInteractableException, StaleElementReferenceException):
+                # JS fallback
+                if not _is_attached(driver, el):
+                    raise
+                driver.execute_script("""
+                    const el = arguments[0], val = arguments[1];
+                    el.value = '';
+                    el.focus();
+                    el.value = val;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                """, el, text)
+
+            # 값 검증(짧게 재확인)
+            try:
+                v = el.get_attribute("value") or ""
+                if v.strip() == str(text).strip():
+                    # blur 한 번 줘서 서버측 필터/검색 트리거
+                    try: el.send_keys(Keys.TAB)
+                    except Exception: pass
+                    return
+            except StaleElementReferenceException:
+                # 다음 루프로 재시도
+                pass
+
+        except (NoSuchElementException, StaleElementReferenceException, TimeoutException) as e:
+            last_err = e
+
+        # 프레임 흔들릴 수 있으니 기본컨텐츠 복귀 후 쉬고 반복
+        try: driver.switch_to.default_content()
+        except Exception: pass
+        time.sleep(step)
+
+    raise last_err or TimeoutException("safe_send_keys_refind 타임아웃")
+
+
 def wait_invisible(driver, locator, total_sec=8, step=0.3):
     end = time.time() + _adj(total_sec, 0.4)
     step = _adj(step, 0.1)
@@ -302,28 +376,35 @@ def search_and_open_user(driver, ext_number):
     if should_cancel():
         print("[중단] 취소 감지(검색 시작 전)"); return False
 
-    # 1) 검색 인풋 (짧게)
     search_input = (By.XPATH, "//input[@type='text' and contains(@class,'w100')]")
+
+    # ⬇️ 여기에서 예전처럼 inp = wait_present(...); safe_send_keys(driver, inp, ...) 하지 말고
+    #     locator를 그대로 전달해 매 시도마다 refind 하도록:
     try:
-        inp = wait_present(driver, search_input, total_sec=_adj(4, 0.4), step=_adj(0.25, 0.1))
+        # 인풋이 있는지만 짧게 한번 확인 (없으면 바로 스킵)
+        wait_present(driver, search_input, total_sec=_adj(3, 0.4), step=_adj(0.25, 0.1))
     except TimeoutException:
         print("   > 검색 인풋 없음 → 스킵")
         return False
 
-    # 초기화 후 입력
-    try:
-        inp.clear()
-    except Exception:
-        pass
-    safe_send_keys(driver, inp, str(ext_number), total_sec=_adj(2, 0.3), step=_adj(0.2, 0.1))
+    # 입력(반드시 refind형 사용)
+    safe_send_keys_refind(driver, search_input, str(ext_number), total_sec=_adj(2.5, 0.5), step=_adj(0.18, 0.1))
 
-    # 2) Apply(없으면 Enter)
+    # Apply or Enter
     apply_btn = (By.XPATH, "//button[@type='submit' and (normalize-space(.)='Apply' or contains(@class,'custom-button1--valid'))]")
     try:
-        safe_click(driver, apply_btn, total_sec=_adj(0.8, 0.2), step=_adj(0.2, 0.1))
+        safe_click(driver, apply_btn, total_sec=_adj(0.9, 0.25), step=_adj(0.2, 0.1))
     except Exception:
-        try: inp.send_keys(Keys.ENTER)
-        except Exception: pass
+        # 버튼을 못 찾는 UI라면 Enter로 대체
+        try:
+            el = wait_present(driver, search_input, total_sec=_adj(0.8, 0.3), step=_adj(0.2, 0.1))
+            el.send_keys(Keys.ENTER)
+        except Exception:
+            pass
+
+    # 이후 스피너/결과 대기 → (당신 코드 그대로)
+    # ...
+
 
     # 3) 스피너/오버레이 짧게만 대기
     spinners = [
