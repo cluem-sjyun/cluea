@@ -12,6 +12,9 @@
 
 사전 준비
 - 크롬 디버그 모드 실행 (--remote-debugging-port=9222)
+
+셀레니움 다운로드
+- python -m pip install selenium webdriver-manager
 """
 
 import os, time, socket, signal, sys, json

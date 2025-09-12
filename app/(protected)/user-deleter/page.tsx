@@ -6,7 +6,6 @@ import * as XLSX from "xlsx";
 type RangeRow = { start: string; end: string };
 
 export default function UserDeleterPage() {
-  // ✅ 기본값 통일: https://, mtcl, Cluemcluem123#
   const [ip, setIp] = useState("https://");
   const [username, setUsername] = useState("mtcl");
   const [password, setPassword] = useState("Cluemcluem123#");
@@ -59,7 +58,7 @@ export default function UserDeleterPage() {
   const updateRow = (idx: number, key: keyof RangeRow, value: string) =>
     setRanges((rows) => rows.map((r, i) => (i === idx ? { ...r, [key]: value } : r)));
 
-  // 디버그 bat 다운로드(유지)
+  // 디버그 bat 다운로드
   async function downloadDebugBat() {
     window.location.href = "/api/chrome-debug-bat";
   }
@@ -290,22 +289,6 @@ export default function UserDeleterPage() {
             </button>
           </div>
         ))}
-
-        <div>
-          <button
-            type="button"
-            onClick={() => addRow()}
-            className="border px-3 py-2 rounded"
-            title="행 추가"
-          >
-            + 범위 추가
-          </button>
-        </div>
-
-        <small style={{ color: "#6b7280" }}>
-          여러 범위를 추가할 수 있어요. 제출 시 각 범위를 확장해 일괄 삭제합니다.  
-          Import 시 ‘내선번호’만 사용하며, 연속 번호는 자동으로 한 범위로 합쳐집니다.
-        </small>
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>

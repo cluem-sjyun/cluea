@@ -1,3 +1,9 @@
+"""
+셀레니움 다운로드
+- python -m pip install selenium webdriver-manager
+"""
+
+
 # -*- coding: utf-8 -*-
 import os, time, socket, signal
 from selenium import webdriver
@@ -378,7 +384,6 @@ def search_and_open_user(driver, ext_number):
 
     search_input = (By.XPATH, "//input[@type='text' and contains(@class,'w100')]")
 
-    # ⬇️ 여기에서 예전처럼 inp = wait_present(...); safe_send_keys(driver, inp, ...) 하지 말고
     #     locator를 그대로 전달해 매 시도마다 refind 하도록:
     try:
         # 인풋이 있는지만 짧게 한번 확인 (없으면 바로 스킵)
@@ -401,9 +406,6 @@ def search_and_open_user(driver, ext_number):
             el.send_keys(Keys.ENTER)
         except Exception:
             pass
-
-    # 이후 스피너/결과 대기 → (당신 코드 그대로)
-    # ...
 
 
     # 3) 스피너/오버레이 짧게만 대기

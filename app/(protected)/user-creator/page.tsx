@@ -437,16 +437,6 @@ export default function UserCreatorPage() {
           </div>
         ))}
 
-        <div>
-          <button type="button" onClick={() => addRow()} className="border px-3 py-2 rounded" title="맨 아래 묶음 추가">
-            + 묶음 추가
-          </button>
-        </div>
-
-        <small style={{ color: "#6b7280" }}>
-          각 묶음은 <b>시작/끝 내선번호, 엔티티, Set Type, 헌트/픽업 그룹</b>을 한 번에 설정합니다.  
-          Import 시 내선번호가 비어있는 기존 빈 행은 자동 삭제됩니다.
-        </small>
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>

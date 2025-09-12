@@ -22,7 +22,6 @@ const firebaseConfig = {
 // HMR 대비 전역 캐시
 declare global {
   // 전역 보조 캐시 (declare global에서 var 사용은 TS 문법이고, eslint-disable 주석 불필요)
-  // eslint 규칙 경고가 다시 뜨면 프로젝트 eslint 설정에서 declare global 내 var 예외를 허용하세요.
   var __FIREBASE_APP__: FirebaseApp | undefined;
   var __FIREBASE_AUTH__: Auth | undefined;
   var __FIREBASE_DB__: Firestore | undefined;
