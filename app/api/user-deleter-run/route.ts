@@ -1,56 +1,29 @@
 import { NextRequest } from "next/server";
-import { spawn, ChildProcess } from "child_process";
-import path from "node:path";
-import fs from "node:fs";
-import os from "node:os";
 import { killTree } from "@/app/kill-tree";
+import {
+  beginJob,
+  captureChildOutput,
+  createJobState,
+  findScriptPath,
+  isJobIdle,
+  markJobRunning,
+  resetJob,
+  resolvePython,
+  waitForChildClose,
+  writeCancelFlag,
+  writeCancelFlagPath,
+} from "@/app/api/_utils/job-control";
+import { spawn } from "child_process";
+import type { ChildProcess } from "child_process";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type JobState = {
-  status: "idle" | "starting" | "running" | "stopping";
-  child: ChildProcess | null;
-  cancelRequested: boolean;
-  cancelFlagPath: string | null;
-};
-
-const job: JobState = {
-  status: "idle",
-  child: null,
-  cancelRequested: false,
-  cancelFlagPath: null,
-};
-
-function toAbs(p: string) {
-  return path.isAbsolute(p) ? p : path.join(process.cwd(), p);
-}
-
-function ensureCancelFlag() {
-  const fp = path.join(os.tmpdir(), `user-deleter-cancel.flag`);
-  try {
-    fs.writeFileSync(fp, "0", "utf8");
-  } catch {}
-  return fp;
-}
-
-function writeCancelFlag(p?: string | null) {
-  if (!p) return;
-  try {
-    fs.writeFileSync(p, "1", "utf8");
-  } catch {}
-}
-
-function clearCancelFlag(p?: string | null) {
-  if (!p) return;
-  try {
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-  } catch {}
-}
+const job = createJobState("user-deleter-cancel.flag");
 
 async function gentleStop(child: ChildProcess, cancelPath: string | null) {
   // 1) 플래그로 파이썬에 “취소” 통지
-  writeCancelFlag(cancelPath);
+  writeCancelFlagPath(cancelPath);
 
   // 2) SIGTERM으로 정상 종료 유도
   const pid = child.pid;
@@ -91,72 +64,74 @@ async function gentleStop(child: ChildProcess, cancelPath: string | null) {
   }
 }
 
-function resolvePython() {
-  // 우선순위: env → python3 → python
-  const fromEnv = process.env.PYTHON_BIN?.trim();
-  if (fromEnv) return fromEnv;
-  return process.platform === "win32" ? "python" : "python3";
+type DeleterPayload = {
+  ip?: string;
+  username?: string;
+  password?: string;
+  extList?: unknown;
+  startExt?: unknown;
+  endExt?: unknown;
+};
+
+function parseDeleterPayload(value: unknown): DeleterPayload {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+
+  const record = value as Record<string, unknown>;
+  return {
+    ip: typeof record.ip === "string" ? record.ip : undefined,
+    username: typeof record.username === "string" ? record.username : undefined,
+    password: typeof record.password === "string" ? record.password : undefined,
+    extList: record.extList,
+    startExt: record.startExt,
+    endExt: record.endExt,
+  };
+}
+
+function isIntegerValue(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value);
 }
 
 export async function POST(req: NextRequest) {
-  if (job.status !== "idle") {
+  if (!isJobIdle(job)) {
     return new Response(JSON.stringify({ error: "현재 작업 중입니다." }), { status: 429 });
   }
 
-  job.status = "starting";
-  job.cancelRequested = false;
-  job.child = null;
-  job.cancelFlagPath = ensureCancelFlag();
+  beginJob(job);
 
   try {
-    const body = await req.json();
-    const { ip, username, password, extList, startExt, endExt } = body || {};
+    const { ip, username, password, extList, startExt, endExt } = parseDeleterPayload(await req.json());
 
     if (!ip || !username || !password) {
-      job.status = "idle";
-      clearCancelFlag(job.cancelFlagPath);
-      job.cancelFlagPath = null;
+      resetJob(job);
       return new Response(JSON.stringify({ error: "IP/계정/비밀번호는 필수입니다." }), { status: 400 });
     }
 
-    const pyBin = resolvePython();
-    let scriptPath =
+    const scriptPath =
       process.env.PY_DELETER_SCRIPT_PATH || "python-scripts/attach_delete_user_extensions.py";
 
-    let resolved = toAbs(scriptPath);
-    if (!fs.existsSync(resolved)) {
-      // 오타 호환
-      const alt = scriptPath
-        .replace("python-script", "python-scripts")
-        .replace("python-scripts", "python-script");
-      const altAbs = toAbs(alt);
-      if (fs.existsSync(altAbs)) resolved = altAbs;
-    }
-    if (!fs.existsSync(resolved)) {
-      job.status = "idle";
-      clearCancelFlag(job.cancelFlagPath);
-      job.cancelFlagPath = null;
-      return new Response(JSON.stringify({ error: `스크립트를 찾을 수 없습니다: ${resolved}` }), {
+    const resolved = findScriptPath(scriptPath);
+    if (!resolved) {
+      resetJob(job);
+      return new Response(JSON.stringify({ error: `스크립트를 찾을 수 없습니다: ${scriptPath}` }), {
         status: 400,
       });
     }
 
+    const pyBin = resolvePython();
     // extList 우선, 없으면 start/end 허용
     const envExtra: Record<string, string> = {};
     if (Array.isArray(extList) && extList.length > 0) {
-      const cleaned = extList.filter((n: any) => Number.isInteger(n));
+      const cleaned = extList.filter((value: unknown): value is number => isIntegerValue(value));
       if (cleaned.length === 0) {
-        job.status = "idle";
-        clearCancelFlag(job.cancelFlagPath);
-        job.cancelFlagPath = null;
+        resetJob(job);
         return new Response(JSON.stringify({ error: "유효한 내선번호가 없습니다." }), { status: 400 });
       }
       envExtra.START_EXT_LIST = cleaned.join(",");
     } else {
-      if (!Number.isInteger(startExt) || !Number.isInteger(endExt)) {
-        job.status = "idle";
-        clearCancelFlag(job.cancelFlagPath);
-        job.cancelFlagPath = null;
+      if (!isIntegerValue(startExt) || !isIntegerValue(endExt)) {
+        resetJob(job);
         return new Response(JSON.stringify({ error: "시작/끝 내선번호는 정수여야 합니다." }), {
           status: 400,
         });
@@ -178,8 +153,9 @@ export async function POST(req: NextRequest) {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    job.child = child;
-    job.status = "running";
+    markJobRunning(job, child);
+
+    const collectOutput = captureChildOutput(child);
 
     // 혹시 실행 직후 이미 중지 요청이 들어와 있었으면 즉시 중지 경로로
     if (job.cancelRequested) {
@@ -187,39 +163,26 @@ export async function POST(req: NextRequest) {
       await gentleStop(child, job.cancelFlagPath);
     }
 
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
+    const code = await waitForChildClose(child);
+    const { stdout, stderr } = collectOutput();
 
-    const code: number = await new Promise((resolve) =>
-      child.on("close", (c) => resolve(c ?? 0)),
-    );
-
-    job.child = null;
-    job.cancelRequested = false;
-    job.status = "idle";
-    clearCancelFlag(job.cancelFlagPath);
-    job.cancelFlagPath = null;
+    resetJob(job);
 
     return new Response(JSON.stringify({ code, stdout, stderr }), {
       status: code === 0 ? 200 : 500,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (e: any) {
+  } catch (error: unknown) {
     // 예외 시 자원 정리
     if (job.child?.pid) {
       try {
         await gentleStop(job.child, job.cancelFlagPath);
       } catch {}
     }
-    job.child = null;
-    job.cancelRequested = false;
-    job.status = "idle";
-    clearCancelFlag(job.cancelFlagPath);
-    job.cancelFlagPath = null;
+    resetJob(job);
 
-    return new Response(JSON.stringify({ error: String(e?.message || e) }), {
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
@@ -231,7 +194,7 @@ export async function stopCurrentChild() {
   job.cancelRequested = true;
 
   // 플래그 먼저 기록
-  writeCancelFlag(job.cancelFlagPath);
+  writeCancelFlag(job);
 
   // 실행 중/시작 중일 때만 프로세스 종료 시도
   const child = job.child;
@@ -241,11 +204,7 @@ export async function stopCurrentChild() {
   }
 
   // 상태 리셋
-  job.child = null;
-  job.status = "idle";
-  job.cancelRequested = false;
-  clearCancelFlag(job.cancelFlagPath);
-  job.cancelFlagPath = null;
+  resetJob(job);
 
   return true;
 }
