@@ -15,6 +15,8 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import styles from "./page.module.css";
+export const dynamic = "force-dynamic";
+
 
 type SharedDoc = {
   content?: string;

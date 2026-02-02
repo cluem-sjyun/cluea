@@ -14,7 +14,9 @@ import {
   updateDoc,
   type Timestamp,
 } from "firebase/firestore";
-import styles from "./page.module.css"; // ✅ 추가
+import styles from "./page.module.css";
+
+export const dynamic = "force-dynamic";
 
 type SharedDoc = {
   content?: string;
@@ -23,6 +25,7 @@ type SharedDoc = {
 };
 
 export default function Note1() {
+  
   const router = useRouter();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
