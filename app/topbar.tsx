@@ -7,9 +7,9 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/note1", label: "note1" },
   { href: "/note2", label: "note2" },
-  { href: "/ex3",   label: "ex3"   },
-  { href: "/ex4",   label: "ex4"   },
-  { href: "/ex5",   label: "ex5"   },
+  { href: "/note3",   label: "note3"   },
+  { href: "/note4",   label: "note4"   },
+  { href: "/note5",   label: "note5"   },
 ];
 
 export default function Topbar() {
