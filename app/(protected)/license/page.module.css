@@ -157,3 +157,21 @@
     flex-direction: column;
   }
 }
+
+.card + .card { margin-top: 20px; }
+.entitlementGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 20px 0; }
+.entitlement { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; border: 1px solid #e0e6f5; border-radius: 12px; color: #66728c; }
+.entitlementActive { border-color: #8aa8fa; background: #f6f8ff; color: #24324d; }
+.entitlement span { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.entitlement input[type="number"] { width: 76px; border: 1px solid #d6def9; border-radius: 8px; padding: 7px; }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th,.table td { padding: 12px 10px; border-bottom: 1px solid #edf0f7; text-align: left; vertical-align: top; }
+.table th { color: #5b6784; white-space: nowrap; }
+.active,.revoked { display: inline-block; padding: 4px 8px; border-radius: 999px; font-weight: 700; }
+.active { color: #157038; background: #e9f8ee; }
+.revoked { color: #a52d2d; background: #ffeded; }
+.rowActions { display: flex; gap: 6px; }
+.rowActions button { border: 0; border-radius: 7px; padding: 6px 9px; cursor: pointer; color: #28428d; background: #eef3ff; }
+.rowActions .dangerButton { color: #a52d2d; background: #ffeded; }
+@media (max-width:720px) { .entitlementGrid { grid-template-columns: 1fr; } }
