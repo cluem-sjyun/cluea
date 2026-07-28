@@ -21,8 +21,9 @@ const OPTIONS = [
   ['active_calls', '동시 통화', '콜', 100],
 ] as const;
 const TOGGLES = [['call_monitoring', '통화 모니터링'], ['tts', 'TTS'], ['department_sync', '부서 동기화']] as const;
-const FEATURE_DEFAULTS = { call_monitoring: false, tts: false, department_sync: false };
+const FEATURE_DEFAULTS = { call_monitoring: true, tts: true, department_sync: true };
 const DEFAULT_QUANTITIES = Object.fromEntries(OPTIONS.map(([key, , , qty]) => [key, String(qty)]));
+const DEFAULT_ENABLED = Object.fromEntries(OPTIONS.map(([key]) => [key, true]));
 
 const hex = (buffer: ArrayBuffer) => Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 const normalizeMac = (value: string) => value.trim().toLowerCase().replace(/[^a-f0-9]/g, '');
@@ -43,7 +44,7 @@ export default function LicensePage() {
   const [siteName, setSiteName] = useState('');
   const [mac, setMac] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>(DEFAULT_QUANTITIES);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>({ ipt_users: true });
+  const [enabled, setEnabled] = useState<Record<string, boolean>>(DEFAULT_ENABLED);
   const [featureStates, setFeatureStates] = useState<Record<string, boolean>>(FEATURE_DEFAULTS);
   const [editing, setEditing] = useState<LicenseRecord | null>(null);
   const [issued, setIssued] = useState<IssuedLicense | null>(null);
@@ -65,7 +66,7 @@ export default function LicensePage() {
     }).catch(() => setMessage('라이센스 정보를 불러오지 못했습니다.'));
   }, []);
 
-  const reset = () => { setSiteName(''); setMac(''); setQuantities(DEFAULT_QUANTITIES); setEnabled({ ipt_users: true }); setFeatureStates(FEATURE_DEFAULTS); setEditing(null); history.replaceState(null, '', '/license'); };
+  const reset = () => { setSiteName(''); setMac(''); setQuantities(DEFAULT_QUANTITIES); setEnabled(DEFAULT_ENABLED); setFeatureStates(FEATURE_DEFAULTS); setEditing(null); history.replaceState(null, '', '/license'); };
   const save = async () => {
     const normalizedSiteName = siteName.trim(); const normalizedMac = normalizeMac(mac);
     const capacity: Entitlement[] = OPTIONS.filter(([key]) => enabled[key]).map(([key, name, unit]) => ({ key, name, unit, enabled: true, quantity: Number(quantities[key]) }));
