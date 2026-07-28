@@ -5,12 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
+  { href: "/license", label: "라이센스" },
+  { href: "/license/history", label: "라이센스 현황" },
   { href: "/note1", label: "note1" },
   { href: "/note2", label: "note2" },
-  { href: "/note3",   label: "note3"   },
-  { href: "/note4",   label: "note4"   },
-  { href: "/note5",   label: "note5"   },
-  { href: "/license", label: "라이선스" },
+  { href: "/note3", label: "note3" },
+  { href: "/note4", label: "note4" },
+  { href: "/note5", label: "note5" },
 ];
 
 export default function Topbar() {
@@ -33,7 +34,7 @@ export default function Topbar() {
       <div style={{ fontWeight: 700 }}>ClueA</div>
       <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {LINKS.map((l) => {
-          const active = pathname === l.href || pathname.startsWith(l.href + "/");
+          const active = l.href === "/license" ? pathname === l.href : pathname === l.href || pathname.startsWith(l.href + "/");
           return (
             <Link
               key={l.href}

@@ -175,3 +175,14 @@
 .rowActions button { border: 0; border-radius: 7px; padding: 6px 9px; cursor: pointer; color: #28428d; background: #eef3ff; }
 .rowActions .dangerButton { color: #a52d2d; background: #ffeded; }
 @media (max-width:720px) { .entitlementGrid { grid-template-columns: 1fr; } }
+.featureGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 0 0 20px; }
+.featureCard { padding: 14px; border: 1px solid #e0e6f5; border-radius: 12px; background: #fafbff; }
+.featureCard strong { display: block; margin-bottom: 10px; color: #24324d; }
+.toggleButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.toggleButtons button { border: 1px solid #d6def9; border-radius: 8px; padding: 8px; background: #fff; color: #66728c; font-weight: 700; cursor: pointer; }
+.toggleButtons .toggleActive { border-color: #2f6df6; background: #2f6df6; color: #fff; }
+.toggleButtons .toggleInactive { border-color: #aeb7ca; background: #e9ecf2; color: #4f596d; }
+@media (max-width:720px) { .featureGrid { grid-template-columns: 1fr; } }
+.historyLink { display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 9px; background: #eef3ff; color: #28428d; text-decoration: none; font-weight: 700; white-space: nowrap; }
+.rowActions a { border-radius: 7px; padding: 6px 9px; color: #28428d; background: #eef3ff; text-decoration: none; }
+.empty { padding: 28px !important; text-align: center !important; color: #7a849b; }
