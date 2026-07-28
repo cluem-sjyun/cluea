@@ -15,6 +15,12 @@ export default function ClientAuthGuard({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setLoading(false);
 
+      // 루트(/)에서 이미 로그인된 사용자는 라이센스 페이지로 바로 보내기
+      if (user?.email?.endsWith("@cluem.com") && pathname === "/") {
+        router.replace("/license");
+        return;
+      }
+
       // 1) 로그인 안 됐거나, 2) 도메인 검증(@cluem.com) 실패 → 루트로 리다이렉트
       if (
         (!user || !user.email?.endsWith("@cluem.com")) &&
