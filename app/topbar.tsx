@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/note3",   label: "note3"   },
   { href: "/note4",   label: "note4"   },
   { href: "/note5",   label: "note5"   },
+  { href: "/license", label: "라이선스" },
 ];
 
 export default function Topbar() {

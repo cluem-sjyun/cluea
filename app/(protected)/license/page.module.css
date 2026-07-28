@@ -1,0 +1,159 @@
+.page {
+  min-height: calc(100vh - 56px);
+  padding: 24px;
+  background: linear-gradient(135deg, #f4f7ff 0%, #eef4ff 100%);
+}
+
+.card {
+  max-width: 860px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(24, 46, 91, 0.12);
+  padding: 28px;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #4b6df2;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  color: #14213d;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #4b6df2;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.description {
+  color: #5b6784;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+  color: #24324d;
+}
+
+.field input {
+  border: 1px solid #d6def9;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.helperRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.helperText {
+  color: #4f5e7a;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.button,
+.primaryButton,
+.secondaryButton {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: #2f6df6;
+  color: #fff;
+}
+
+.secondaryButton {
+  background: #eef3ff;
+  color: #28428d;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.status {
+  color: #1c7a34;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.previewBox {
+  padding: 16px;
+  border-radius: 16px;
+  background: #f8faff;
+  border: 1px solid #e6ecff;
+}
+
+.previewBox h2 {
+  margin-top: 0;
+  font-size: 16px;
+  color: #17335f;
+}
+
+.previewBox pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #44506b;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .head {
+    flex-direction: column;
+  }
+}
