@@ -21,9 +21,8 @@ const OPTIONS = [
   ['active_calls', '동시 통화', '콜', 100],
 ] as const;
 const TOGGLES = [['call_monitoring', '통화 모니터링'], ['tts', 'TTS'], ['department_sync', '부서 동기화']] as const;
-const FEATURE_DEFAULTS = { call_monitoring: true, tts: true, department_sync: true };
-const DEFAULT_QUANTITIES = Object.fromEntries(OPTIONS.map(([key, , , qty]) => [key, String(qty)]));
-const DEFAULT_ENABLED = Object.fromEntries(OPTIONS.map(([key]) => [key, true]));
+const FEATURE_DEFAULTS = { call_monitoring: false, tts: false, department_sync: false };
+const DEFAULT_QUANTITIES = Object.fromEntries(OPTIONS.map(([key]) => [key, '0']));
 
 const hex = (buffer: ArrayBuffer) => Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
 const normalizeMac = (value: string) => value.trim().toLowerCase().replace(/[^a-f0-9]/g, '');
@@ -44,7 +43,6 @@ export default function LicensePage() {
   const [siteName, setSiteName] = useState('');
   const [mac, setMac] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>(DEFAULT_QUANTITIES);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(DEFAULT_ENABLED);
   const [featureStates, setFeatureStates] = useState<Record<string, boolean>>(FEATURE_DEFAULTS);
   const [editing, setEditing] = useState<LicenseRecord | null>(null);
   const [issued, setIssued] = useState<IssuedLicense | null>(null);
@@ -60,25 +58,24 @@ export default function LicensePage() {
       const licenses: Entitlement[] = Array.isArray(data.licenses) ? data.licenses : [];
       const record = { id: snapshot.id, siteName: String(data.siteName ?? ''), mac: String(data.mac ?? ''), revision: Number(data.revision ?? 1), issuedAt: String(data.issuedAt ?? ''), licenses };
       setEditing(record); setSiteName(record.siteName); setMac(formatMacInput(record.mac));
-      setEnabled(Object.fromEntries(licenses.filter((item) => !TOGGLES.some(([key]) => key === item.key)).map((item) => [item.key, true])));
       setFeatureStates({ ...FEATURE_DEFAULTS, ...Object.fromEntries(licenses.filter((item) => TOGGLES.some(([key]) => key === item.key)).map((item) => [item.key, item.enabled])) });
       setQuantities({ ...DEFAULT_QUANTITIES, ...Object.fromEntries(licenses.map((item) => [item.key, String(item.quantity)])) });
     }).catch(() => setMessage('라이센스 정보를 불러오지 못했습니다.'));
   }, []);
 
-  const reset = () => { setSiteName(''); setMac(''); setQuantities(DEFAULT_QUANTITIES); setEnabled(DEFAULT_ENABLED); setFeatureStates(FEATURE_DEFAULTS); setEditing(null); history.replaceState(null, '', '/license'); };
+  const reset = () => { setSiteName(''); setMac(''); setQuantities(DEFAULT_QUANTITIES); setFeatureStates(FEATURE_DEFAULTS); setEditing(null); history.replaceState(null, '', '/license'); };
   const save = async () => {
     const normalizedSiteName = siteName.trim(); const normalizedMac = normalizeMac(mac);
-    const capacity: Entitlement[] = OPTIONS.filter(([key]) => enabled[key]).map(([key, name, unit]) => ({ key, name, unit, enabled: true, quantity: Number(quantities[key]) }));
-    const features: Entitlement[] = TOGGLES.map(([key, name]) => ({ key, name, unit: '상태', enabled: Boolean(featureStates[key]), quantity: 1 }));
+    const capacity: Entitlement[] = OPTIONS.map(([key, name, unit]) => ({ key, name, unit, enabled: Number(quantities[key]) > 0, quantity: Number(quantities[key]) }));
+    const features: Entitlement[] = TOGGLES.map(([key, name]) => ({ key, name, unit: '상태', enabled: Boolean(featureStates[key]), quantity: featureStates[key] ? 1 : 0 }));
     const licenses = [...capacity, ...features];
     if (!normalizedSiteName) return setMessage('사이트명을 입력해 주세요.');
     if (normalizedMac.length !== 12) return setMessage('MAC 주소를 12자리 16진수로 입력해 주세요.');
-    if (!capacity.length || capacity.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1)) return setMessage('라이센스를 선택하고 수량을 1 이상 입력해 주세요.');
+    if (capacity.some((item) => !Number.isInteger(item.quantity) || item.quantity < 0)) return setMessage('라이센스 수량을 0 이상의 정수로 입력해 주세요.');
     setBusy(true);
     try {
       const now = new Date().toISOString(); const licenseId = editing?.id ?? crypto.randomUUID(); const revision = editing ? editing.revision + 1 : 1;
-      const file = await sign({ version: 3, licenseId, revision, siteName: normalizedSiteName, mac: normalizedMac, licenseCount: Math.max(...capacity.map((item) => item.quantity)), issuedAt: now, scope: 'cluem_web', licenses });
+      const file = await sign({ version: 3, licenseId, revision, siteName: normalizedSiteName, mac: normalizedMac, licenseCount: Math.max(...licenses.map((item) => item.quantity)), issuedAt: now, scope: 'cluem_web', licenses });
       const ref = doc(db, 'licenses', licenseId); const actor = auth.currentUser?.email ?? 'unknown';
       await setDoc(ref, { siteName: normalizedSiteName, mac: normalizedMac, status: 'active', revision, issuedAt: editing?.issuedAt ?? now, updatedAt: now, licenses, latestHash: file.hash, updatedBy: actor, serverUpdatedAt: serverTimestamp() });
       await addDoc(collection(ref, 'events'), { type: editing ? 'changed' : 'issued', revision, occurredAt: now, actor, siteName: normalizedSiteName, mac: normalizedMac, licenses, hash: file.hash, serverOccurredAt: serverTimestamp() });
@@ -91,7 +88,7 @@ export default function LicensePage() {
     <div className={styles.head}><div><p className={styles.eyebrow}>License management</p><h1 className={styles.title}>{editing ? '라이센스 변경' : '라이센스 발급'}</h1></div><a className={styles.historyLink} href="/license/history">발급·변경·폐기 현황</a></div>
     <label className={styles.field}><span>사이트명</span><input value={siteName} onChange={(e) => setSiteName(e.target.value)} /></label>
     <label className={styles.field}><span>MAC 주소</span><input value={mac} onChange={(e) => setMac(formatMacInput(e.target.value))} maxLength={17} /></label>
-    <div className={styles.entitlementGrid}>{OPTIONS.map(([key, name, unit]) => <label className={`${styles.entitlement} ${enabled[key] ? styles.entitlementActive : ''}`} key={key}><span><input type="checkbox" checked={Boolean(enabled[key])} onChange={(e) => setEnabled((old) => ({ ...old, [key]: e.target.checked }))} /> {name}</span><span><input type="number" min="1" disabled={!enabled[key]} value={quantities[key]} onChange={(e) => setQuantities((old) => ({ ...old, [key]: e.target.value }))} /> {unit}</span></label>)}</div>
+    <div className={styles.entitlementGrid}>{OPTIONS.map(([key, name, unit]) => <label className={`${styles.entitlement} ${Number(quantities[key]) > 0 ? styles.entitlementActive : ''}`} key={key}><strong>{name}</strong><span><input type="number" min="0" value={quantities[key]} onChange={(e) => setQuantities((old) => ({ ...old, [key]: e.target.value }))} /> {unit}</span></label>)}</div>
     <div className={styles.featureGrid}>{TOGGLES.map(([key, name]) => <div className={styles.featureCard} key={key}><strong>{name}</strong><div className={styles.toggleButtons}><button type="button" className={featureStates[key] ? styles.toggleActive : ''} onClick={() => setFeatureStates((old) => ({ ...old, [key]: true }))}>사용</button><button type="button" className={!featureStates[key] ? styles.toggleInactive : ''} onClick={() => setFeatureStates((old) => ({ ...old, [key]: false }))}>미사용</button></div></div>)}</div>
     <div className={styles.actions}><button className={styles.primaryButton} onClick={save} disabled={busy}>{busy ? '처리 중...' : editing ? '변경 파일 생성' : '발급 파일 생성'}</button>{editing && <button className={styles.secondaryButton} onClick={reset}>변경 취소</button>}<button className={styles.secondaryButton} onClick={download} disabled={!issued}>.lic 다운로드</button></div>
     {message && <p className={styles.status}>{message}</p>}
